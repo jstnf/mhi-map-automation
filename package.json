@@ -1,0 +1,19 @@
+{
+  "name": "mhi-map-automation",
+  "version": "1.0.0",
+  "description": "An application that automatically generates iframe embeds for MHI every day.",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js"
+  },
+  "author": "Justin F",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.17.1",
+    "https": "^1.0.0",
+    "node-cron": "^2.0.3",
+    "querystring": "^0.2.1",
+    "utf8": "^3.0.0"
+  },
+  "devDependencies": {}
+}
