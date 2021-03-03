@@ -8,7 +8,7 @@ const app = express();
 
 // Set with environment variables (like on Heroku)
 var apiKey = process.env.DATAWRAPPER_KEY;
-const chartId = 'K44HG';
+const chartId = process.env.DATAWRAPPER_CHART_ID;
 
 console.log('Using Datawrapper key: ' + apiKey);
 
