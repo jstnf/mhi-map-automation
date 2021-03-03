@@ -10,6 +10,8 @@ const app = express();
 var apiKey = process.env.DATAWRAPPER_KEY;
 const chartId = process.env.DATAWRAPPER_CHART_ID;
 
+var mapCurrentVersion = 0;
+
 console.log('Using Datawrapper key: ' + apiKey);
 
 // APPLICATION
@@ -33,7 +35,12 @@ app.listen(port, () => {
 });
 
 app.get('/', (req, res) => {
-  res.send('<p>' + bodyData + '</p>');
+  res.send(`
+  
+  <iframe title="COVID-19 Cases Per 100,000 People in United States" aria-label="map" id="datawrapper-chart-${chartId}" src="https://datawrapper.dwcdn.net/${chartId}/${mapCurrentVersion}/" scrolling="no" frameborder="0" style="width: 0; min-width: 75% !important; border: none;" height="369"></iframe><script type="text/javascript">!function(){"use strict";window.addEventListener("message",(function(a){if(void 0!==a.data["datawrapper-height"])for(var e in a.data["datawrapper-height"]){var t=document.getElementById("datawrapper-chart-"+e)||document.querySelector("iframe[src*='"+e+"']");t&&(t.style.height=a.data["datawrapper-height"][e]+"px")}}))}();
+				</script>
+  
+  `);
 });
 
 // ROUTINE
@@ -70,8 +77,9 @@ function routine() {
     uploadData(formattedData);
   }).catch(() => {
     console.log('There was an error attempting to grab COVID data. Attempting to retry with yesterday\'s date!');
-    _date.setDate(_date.getDate() - 1);
-    dateTimestamp = getFormattedDate(_date);
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    dateTimestamp = getFormattedDate(yesterday);
 
     getReport().then((data) => {
       const response = {
@@ -147,7 +155,12 @@ function processData(responseBody) {
 }
 
 function updateMetadata(responseBody) {
-  const newDesc = '<b>Date:</b> ' + (new Intl.DateTimeFormat('en-US', { dateStyle: 'full' }).format(_date)) + '\n<br><b>Total Cases:</b> ' + totalCases + ' <b>Total Deaths:</b> ' + totalDeaths;
+  const ye = new Intl.DateTimeFormat('en', { year: 'numeric' }).format(_date);
+  const mo = new Intl.DateTimeFormat('en', { month: 'long' }).format(_date);
+  const da = new Intl.DateTimeFormat('en', { day: 'numeric' }).format(_date);
+  const dateString = `${mo} ${da}, ${ye}`;
+
+  const newDesc = '<b>Date:</b> ' + dateString + '\n<br><b>Total Cases:</b> ' + totalCases + ' <b>Total Deaths:</b> ' + totalDeaths;
 
   const descPatchReq = https.request({
     host: 'api.datawrapper.de',
@@ -187,10 +200,13 @@ function updateMetadata(responseBody) {
 
   // Update with current date and time, COVID total stats
   let params = JSON.stringify({
-    'utf8': true,
+    "title": "COVID-19 Cases Per 100,000 People in United States",
     'metadata': {
       'describe': {
-        'intro': `${newDesc}`
+        "byline": "Masked Heroes Initiative",
+        'intro': `${newDesc}`,
+        "source-name": "Johns Hopkins University",
+        "source-url": "https://github.com/CSSEGISandData/COVID-19"
       },
       axes: {
         keys: 'state',
@@ -202,7 +218,17 @@ function updateMetadata(responseBody) {
             "type": "text"
           }
         }
-      }
+      },
+      "visualize": {
+        "tooltip": {
+          "body": "<b>Cases per 100,000:</b> {{ rate }}\n<br><b>Total:</b> {{ confirmed }}\n<br><b>Deaths:</b> {{ deaths }}",
+          "enabled": true,
+          "sticky": true,
+          "title": "{{ state }}"
+        }
+      },
+      "zoom-button-pos": "br",
+      "zoomable": true
     }
   });
   console.log(params);
@@ -278,11 +304,13 @@ function publishChart() {
     });
 
     publishPostRes.on('end', () => {
-        console.log('Body: ', JSON.parse(data));
+        var parsedData = JSON.parse(data);
+        console.log('Body: ', parsedData);
 
-        // Successfully updated the data, let's publish
         if (publishPostRes.statusCode === 200) {
-          console.log('Successfully published new chart!')
+          // Update the current version
+          mapCurrentVersion = parsedData.version;
+          console.log('Successfully published new chart! (version ' + mapCurrentVersion + ')');
         }
     });
 
