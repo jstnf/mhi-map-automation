@@ -8,7 +8,7 @@ const app = express();
 
 // Set with environment variables (like on Heroku)
 var apiKey = process.env.DATAWRAPPER_KEY;
-const chartId = '3QuYf';
+const chartId = 'K44HG';
 
 console.log('Using Datawrapper key: ' + apiKey);
 
@@ -41,6 +41,8 @@ app.get('/', (req, res) => {
 var _date = new Date();
 var dateTimestamp = ''
 
+var formattedData = '';
+
 function routine() {
   console.log('Performing cron update routine for MHI map!');
 
@@ -65,7 +67,7 @@ function routine() {
 
     // We successfully grabbed the data, let's continue
     processData(trimmed);
-    uploadData(trimmed);
+    uploadData(formattedData);
   }).catch(() => {
     console.log('There was an error attempting to grab COVID data. Attempting to retry with yesterday\'s date!');
     _date.setDate(_date.getDate() - 1);
@@ -89,7 +91,7 @@ function routine() {
 
       // We successfully grabbed the data, let's continue
       processData(trimmed);
-      uploadData(trimmed);
+      uploadData(formattedData);
     }).catch(() => {
       console.log('Could not grab yesterday\'s data. Abandoning job!')
     })
@@ -101,9 +103,15 @@ function routine() {
 var totalCases = 0;
 var totalDeaths = 0;
 
+var headersAdded = false;
+
 // Sets totalCases and totalDeaths from the CSV data
 function processData(responseBody) {
   totalCases = 0, totalDeaths = 0;
+
+  // Reset variables for next run
+  formattedData = '';
+  headersAdded = false;
 
   const lines = responseBody.split('\n');
   lines.forEach(element => {
@@ -113,11 +121,29 @@ function processData(responseBody) {
       totalCases += parseInt(parts[5]);
       totalDeaths += parseInt(parts[6]);
     }
+    
+    if (headersAdded) {
+      // Skip certain rows
+      if (parts[0] === 'American Samoa' 
+          || parts[0] === 'Diamond Princess'
+          || parts[0] === 'Grand Princess'
+          || parts[0] === 'Northern Mariana Islands') {
+        return;
+      }
+      formattedData += parts[0] + ',' + parts[10] + ',' + parts[5] + ',' + parts[6] + '\u000a';
+    } else {
+      formattedData += 'state,rate,confirmed,deaths\u000a';
+      headersAdded = true;
+    }
   });
 
   console.log("Finished data totaling process:");
   console.log(" - cases: " + totalCases);
   console.log(" - deaths: " + totalDeaths);
+
+  console.log('Updating data with new format...');
+  console.log('Updated format below:');
+  console.log(formattedData);
 }
 
 function updateMetadata(responseBody) {
@@ -140,18 +166,18 @@ function updateMetadata(responseBody) {
     descPatchRes.setEncoding('utf8');
 
     descPatchRes.on('data', chunk => {
-        data += chunk;
+      data += chunk;
     });
 
     descPatchRes.on('end', () => {
-        console.log('Body: ', JSON.parse(data));
+      console.log('Body: ', JSON.parse(data));
 
-        // Successfully updated the chart, let's add data and then publish
-        if (descPatchRes.statusCode === 200) {
-          console.log('Successfully updated chart metadata!');
-          console.log('Proceeding to publish chart!');
-          publishChart();
-        }
+      // Successfully updated the chart, let's add data and then publish
+      if (descPatchRes.statusCode === 200) {
+        console.log('Successfully updated chart metadata!');
+        console.log('Proceeding to publish chart!');
+        publishChart();
+      }
     });
 
   }).on('error', e => {
@@ -167,51 +193,16 @@ function updateMetadata(responseBody) {
         'intro': `${newDesc}`
       },
       axes: {
-        keys: 'Province_State',
-        values: 'Incident_Rate'
+        keys: 'state',
+        values: 'rate',
       },
-      "data": { // Extra column format might be breaking the table?
+      "data": {
         "column-format": {
-            "Active": [
-            ],
-            "Case_Fatality_Ratio": [
-            ],
-            "Confirmed": [
-            ],
-            "Country_Region": [
-            ],
-            "Deaths": [
-            ],
-            "FIPS": [
-            ],
-            "Hospitalization_Rate": [
-            ],
-            "ISO3": [
-            ],
-            "Last_Update": [
-            ],
-            "Lat": [
-            ],
-            "Long_": [
-            ],
-            "People_Hospitalized": [
-            ],
-            "Province_State": {
-                "type": "text"
-            },
-            "Recovered": [
-            ],
-            "Testing_Rate": [
-            ],
-            "Total_Test_Results": [
-            ],
-            "UID": [
-            ]
-        },
-        "horizontal-header": true,
-        "transpose": false,
-        "vertical-header": true
-      },
+          "state": {
+            "type": "text"
+          }
+        }
+      }
     }
   });
   console.log(params);
@@ -224,8 +215,11 @@ function uploadData(responseBody) {
     host: 'api.datawrapper.de',
     path: '/v3/charts/' + chartId + "/data",
     method: 'PUT',
+    encoding: 'utf8',
     headers: {
-      'authorization': `Bearer ${apiKey}`
+      'authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'text/csv;charset=utf-8',
+      'Accept': '*/*'
     }
   }, dataPutRes => {
 
@@ -237,18 +231,18 @@ function uploadData(responseBody) {
     dataPutRes.setEncoding('utf8');
 
     dataPutRes.on('data', chunk => {
-        data += chunk;
+      data += chunk;
     });
 
     dataPutRes.on('end', () => {
-        console.log('Body: ', data);
+      console.log('Body: ', data);
 
-        // Successfully updated the data, let's publish
-        if (dataPutRes.statusCode === 204) {
-          console.log('Successfully updated chart data!');
-          console.log('Proceeding to update chart metadata!');
-          updateMetadata(responseBody);
-        }
+      // Successfully updated the data, let's publish
+      if (dataPutRes.statusCode === 204) {
+        console.log('Successfully updated chart data!');
+        console.log('Proceeding to update chart metadata!');
+        updateMetadata(responseBody);
+      }
     });
 
   }).on('error', e => {
@@ -257,7 +251,7 @@ function uploadData(responseBody) {
   });
 
   // Update with gathered data
-  dataPutReq.write(JSON.stringify(responseBody));
+  dataPutReq.write(responseBody);
   dataPutReq.end();
 }
 
