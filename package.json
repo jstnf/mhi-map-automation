@@ -4,7 +4,8 @@
   "description": "An application that automatically generates iframe embeds for MHI every day.",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon index.js"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
   },
   "author": "Justin F",
   "license": "ISC",
@@ -15,5 +16,8 @@
     "querystring": "^0.2.1",
     "utf8": "^3.0.0"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "engines": {
+    "node": "14.15.5"
+  }
 }
