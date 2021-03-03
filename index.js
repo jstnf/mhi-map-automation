@@ -29,10 +29,8 @@ cron.schedule('0 0 0,7,15 * * *', function() {
   routine();
 })
 
-// Listen to process.env.PORT (Heroku) or 5000
-const PORT = process.env.PORT || 5000;
-const HOST = '0.0.0.0';
-app.listen(PORT, () => {
+// Listen to process.env.PORT (Heroku) or 5000 and host '0.0.0.0'
+app.listen(process.env.PORT || 5000, '0.0.0.0', () => {
   console.log(`Example app listening on port ${port}!`);
 });
 
