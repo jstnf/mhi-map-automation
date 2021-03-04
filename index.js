@@ -156,13 +156,18 @@ function processData(responseBody) {
   console.log(formattedData);
 }
 
+// https://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
+function numberWithCommas(x) {
+  return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
+}
+
 function updateMetadata(responseBody) {
   const ye = new Intl.DateTimeFormat('en', { year: 'numeric' }).format(_date);
   const mo = new Intl.DateTimeFormat('en', { month: 'long' }).format(_date);
   const da = new Intl.DateTimeFormat('en', { day: 'numeric' }).format(_date);
   const dateString = `${mo} ${da}, ${ye}`;
 
-  const newDesc = '<b>Date:</b> ' + dateString + '\n<br><b>Total Cases:</b> ' + totalCases + ' <b>Total Deaths:</b> ' + totalDeaths;
+  const newDesc = '<b>Date:</b> ' + dateString + '\n<br><b>Total Cases:</b> ' + numberWithCommas(totalCases) + ' <b>Total Deaths:</b> ' + numberWithCommas(totalDeaths);
 
   const descPatchReq = https.request({
     host: 'api.datawrapper.de',
