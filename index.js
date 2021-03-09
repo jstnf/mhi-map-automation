@@ -103,8 +103,35 @@ function routine() {
       processData(trimmed);
       uploadData(formattedData);
     }).catch(() => {
-      console.log('Could not grab yesterday\'s data. Abandoning job!')
-    })
+      console.log('Could not grab yesterday\'s data. Last attempt to retry with data from two days ago!');
+      var twoDaysAgo = new Date();
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      dateTimestamp = getFormattedDate(twoDaysAgo);
+
+      getReport().then((data) => {
+        const response = {
+          statusCode: 200,
+          body: data,
+        };
+        
+        console.log('Successfully obtained data from ' + dateTimestamp + '!');
+    
+        // We end up with an extra comma sometimes, let's get rid of that!
+        var trimmed = response.body.trim();
+        if (trimmed.charAt(trimmed.length - 1) === ',') {
+          console.log("Removing extraneous comma!");
+          trimmed = trimmed.substring(0, trimmed.length - 1);
+        }
+
+        console.log(trimmed);
+
+        // We successfully grabbed the data, let's continue
+        processData(trimmed);
+        uploadData(formattedData);
+      }).catch(() => {
+        console.log('Could not grab data from today, yesterday, or two days ago. Abandoning job!');
+      });
+    });
   });
 }
 
