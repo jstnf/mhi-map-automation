@@ -6,32 +6,38 @@ const utf8 = require('utf8')
 
 const app = express();
 
-// Set with environment variables (like on Heroku)
+/* ENVIRONMENT VARIABLES */
 var apiKey = process.env.DATAWRAPPER_KEY;
 const chartId = process.env.DATAWRAPPER_CHART_ID;
-
-var mapCurrentVersion = 0;
-
-console.log('Using Datawrapper key: ' + apiKey);
-
-// APPLICATION
-
-// temp
-var bodyData = '';
-
-app.set('view engine', 'ejs');
-
-// Run the routine once, and then schedule the cron job
-routine();
-
-// Run the cron job every day at 12am, 8am, and 4pm
-cron.schedule('0 0 0,7,15 * * *', function() {
-  routine();
-})
 
 // Listen to process.env.PORT (Heroku) or 5000 and host '0.0.0.0'
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0';
+
+console.log('Using Datawrapper key: ' + apiKey);
+
+/* APPLICATION VARIABLES */
+var mapCurrentVersion = 0;                    // Current map version (used when displaying the iframe of the map)
+var _date = new Date();                       // Global variable used in routine() and update functions
+var dateTimestamp = '';                       // Global variable used in routine() function
+var formattedData = '';                       // Global variable used in routine() function
+var totalCases = 0;                           // Used when processing data - inserted into description of map
+var totalDeaths = 0;                          // Used when processing data - inserted into description of map
+var headersAdded = false;                     // Used when processing data - whether we have added the headers to the CSV data
+
+/* APPLICATION SETUP */
+app.set('view engine', 'ejs');
+
+/**
+ * We will run the map gathering routine once when the app starts.
+ * Afterwards, we schedule the cron job. The job occurs
+ * every 12am, 8am, and 4pm server time.
+ */
+routine();
+cron.schedule('0 0 0,7,15 * * *', function() {
+  routine();
+})
+
 app.listen(PORT, HOST, () => {
   console.log(`Example app listening on port ${PORT}!`);
 });
@@ -45,13 +51,7 @@ app.get('/', (req, res) => {
   `);
 });
 
-// ROUTINE
-
-var _date = new Date();
-var dateTimestamp = ''
-
-var formattedData = '';
-
+/* ROUTINE FUNCTION */
 function routine() {
   console.log('Performing cron update routine for MHI map!');
 
@@ -135,13 +135,7 @@ function routine() {
   });
 }
 
-// FUNCTIONS
-
-var totalCases = 0;
-var totalDeaths = 0;
-
-var headersAdded = false;
-
+/* FUNCTIONS */
 // Sets totalCases and totalDeaths from the CSV data
 function processData(responseBody) {
   totalCases = 0, totalDeaths = 0;
@@ -183,12 +177,7 @@ function processData(responseBody) {
   console.log(formattedData);
 }
 
-// https://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
-function numberWithCommas(x) {
-  return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
-}
-
-function updateMetadata(responseBody) {
+function updateMetadata() {
   const ye = new Intl.DateTimeFormat('en', { year: 'numeric' }).format(_date);
   const mo = new Intl.DateTimeFormat('en', { month: 'long' }).format(_date);
   const da = new Intl.DateTimeFormat('en', { day: 'numeric' }).format(_date);
@@ -301,7 +290,7 @@ function uploadData(responseBody) {
       if (dataPutRes.statusCode === 204) {
         console.log('Successfully updated chart data!');
         console.log('Proceeding to update chart metadata!');
-        updateMetadata(responseBody);
+        updateMetadata();
       }
     });
 
@@ -356,12 +345,6 @@ function publishChart() {
   publishPostReq.end();
 }
 
-function getFormattedDate(d) {
-  var formatted = ''
-  formatted = (d.getMonth() + 1).toString().padStart(2, '0') + '-' + d.getDate().toString().padStart(2, '0') + '-' + d.getFullYear();
-  return formatted;
-}
-
 function getReport() {
   return new Promise((resolve, reject) => {
     const req = https.request({
@@ -389,8 +372,20 @@ function getReport() {
   });
 }
 
+/* UTILITY FUNCTIONS */
 function isInt(str) {
-  if (typeof str != "string") return false // we only process strings!  
-  return !isNaN(str) && // use type coercion to parse the _entirety_ of the string (`parseFloat` alone does not do this)...
-         !isNaN(parseInt(str)) // ...and ensure strings of whitespace fail
+  if (typeof str != "string") return false          // we only process strings!  
+  return !isNaN(str) &&                             // use type coercion to parse the _entirety_ of the string (`parseFloat` alone does not do this)...
+         !isNaN(parseInt(str))                      // ...and ensure strings of whitespace fail
+}
+
+function getFormattedDate(d) {
+  var formatted = ''
+  formatted = (d.getMonth() + 1).toString().padStart(2, '0') + '-' + d.getDate().toString().padStart(2, '0') + '-' + d.getFullYear();
+  return formatted;
+}
+
+// https://stackoverflow.com/questions/2901102/how-to-print-a-number-with-commas-as-thousands-separators-in-javascript
+function numberWithCommas(x) {
+  return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
 }
